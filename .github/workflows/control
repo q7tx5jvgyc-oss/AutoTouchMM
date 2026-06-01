@@ -1,5 +1,5 @@
-Package: com.yourname.autotouchmenu
-Name: AutoTouch Mod Menu
+Package: com.yourname.autotouh
+Name: Autotouh Mod Menu
 Depends: mobilesubstrate
 Version: 1.0.0
 Architecture: iphoneos-arm64
