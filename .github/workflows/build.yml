@@ -9,33 +9,20 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Set up Theos Core
+    - name: Compile Pure iOS Dylib
       run: |
-        bash -c "$(curl -fsSL https://githubusercontent.com)"
-        echo "THEOS=~/theos" >> $GITHUB_ENV
-        echo "~/theos/bin" >> $GITHUB_PATH
-        mkdir -p ~/theos/sdks
-        curl -L https://github.com | tar -xf - -C ~/theos/sdks/
-
-    - name: Compile to Dylib
-      run: |
-        export THEOS=~/theos
-        # تشغيل أمر البناء الرسمي لحزمة التويك
-        make FINALPACKAGE=1 || true
-        
-        # إنشاء المجلد المخصص للمخرجات المستخرجة للآيفون
+        # إنشاء المجلد النهائي للمخرجات
         mkdir -p AutoTouchOutput
-        
-        # 1. البحث التلقائي عن ملف dylib المستخرج ووضعه في المجلد
-        find .theos/obj/ -name "*.dylib" -exec cp {} AutoTouchOutput/ \; 2>/dev/null || true
-        find packages/ -name "*.deb" -exec cp {} AutoTouchOutput/ \; 2>/dev/null || true
-        
-        # 2. خطة بديلة مضمونة: تجميع ملف main.mm مباشرة في حال حدوث أي نقص بالهيكل
-        if [ ! -f AutoTouchOutput/*.dylib ] || [ -z "$(ls -A AutoTouchOutput)" ]; then
-          xcrun -sdk iphoneos clang++ -dynamiclib -arch arm64 -arch arm64e -miphoneos-version-min=14.0 -framework UIKit -framework Foundation -fobjc-arc main.mm -o AutoTouchOutput/AutoTouchCore.dylib || true
-        fi
-        
-        # ضغط المجلد بالكامل ليصبح ملف زيب جاهز للتحميل
+
+        # استخدام مترجم آبل الرسمي لتجميع ملف main.mm مباشرة لمعالجات الآيفون الحديثة وتفادي نقص المكاتب المعقدة
+        xcrun -sdk iphoneos clang++ -dynamiclib \
+          -arch arm64 -arch arm64e \
+          -miphoneos-version-min=14.0 \
+          -framework UIKit -framework Foundation \
+          -fobjc-arc main.mm \
+          -o AutoTouchOutput/AutoTouchCore.dylib
+
+        # ضغط المجلد تلقائياً ليتحول إلى صيغة ZIP لسهولة تحميله وفكه على الآيفون
         zip -r AutoTouchDylib.zip AutoTouchOutput
 
     - name: Deliver Zip File
