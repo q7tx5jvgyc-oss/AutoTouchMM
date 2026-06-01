@@ -1,172 +1,172 @@
-name: Mustache Yalla Ludo Touch Builder
-on:
-  push:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
+#import <UIKit/UIKit.h>
+#import <CoreGraphics/CoreGraphics.h>
+#import <QuartzCore/QuartzCore.h>
+#import <mach/mach_time.h>
 
-jobs:
-  build_job:
-    runs-on: macos-14
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+extern "C" {
+    CFTypeRef IOHIDEventCreateDigitizerFingerEvent(CFAllocatorRef allocator, uint64_t timeStamp, uint32_t index, uint32_t identity, uint32_t eventMask, float x, float y, float z, float tipPressure, float twist, objc_bool isInRange, objc_bool isTouched, uint32_t options);
+    void ISendHIDEvent(CFTypeRef event);
+}
 
-    - name: Construct Silent Tweak Files
-      run: |
-        # 1. إنشاء ملف البيانات الوصفية (control)
-        cat << 'EOF' > control
-        Package: com.mustache.silentludo
-        Name: Mustache Silent Ludo Clicker
-        Depends: mobilesubstrate
-        Version: 7.0.0
-        Architecture: iphoneos-arm64
-        Description: ماكرو موستاش المخفي ليلا لودو - تحكم بأزرار الصوت لمنع الفريز ونقرات حقيقية 100%
-        Maintainer: Mustache Developer
-        Author: Mustache
-        Section: Tweaks
-        EOF
+@interface MustacheTargetNode : UIView
+@property (nonatomic, assign) CGPoint screenAbsolutePoint;
+@property (nonatomic, strong) UILabel *numberLabel;
+@end
 
-        # 2. إنشاء ملف التوجيه والفلتر ليعمل داخل نظام الأيفون واللعبة (plist)
-        cat << 'EOF' > MustacheSilentLudo.plist
-        {
-            Filter = {
-                Bundles = ( "com.apple.springboard", "com.yallatech.yallaludo" );
-            };
+@implementation MustacheTargetNode
+- (instancetype)initWithFrame:(CGRect)frame index:(NSInteger)index {
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
+        self.layer.cornerRadius = frame.size.width / 2;
+        self.layer.borderColor = [UIColor whiteColor].CGColor;
+        self.layer.borderWidth = 2.5;
+
+        self.numberLabel = [[UILabel alloc] initWithFrame:self.bounds];
+        self.numberLabel.text = [NSString stringWithFormat:@"%ld", (long)index];
+        self.numberLabel.textColor = [UIColor whiteColor];
+        self.numberLabel.textAlignment = NSTextAlignmentCenter;
+        self.numberLabel.font = [UIFont boldSystemFontOfSize:14];
+        [self addSubview:self.numberLabel];
+
+        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleNodePan:)];
+        [self addGestureRecognizer:pan];
+
+        [self updateAbsoluteScreenPosition];
+    }
+    return self;
+}
+
+- (void)handleNodePan:(UIPanGestureRecognizer *)sender {
+    CGPoint translation = [sender translationInView:self.superview];
+    CGPoint newCenter = CGPointMake(self.center.x + translation.x, self.center.y + translation.y);
+
+    CGFloat halfWidth = self.bounds.size.width / 2.0;
+    CGFloat halfHeight = self.bounds.size.height / 2.0;
+    CGSize screenSize = [UIScreen mainScreen].bounds.size;
+
+    newCenter.x = MAX(halfWidth, MIN(newCenter.x, screenSize.width - halfWidth));
+    newCenter.y = MAX(halfHeight, MIN(newCenter.y, screenSize.height - halfHeight));
+
+    self.center = newCenter;
+    [sender setTranslation:CGPointZero inView:self.superview];
+
+    if (sender.state == UIGestureRecognizerStateEnded || sender.state == UIGestureRecognizerStateChanged) {
+        [self updateAbsoluteScreenPosition];
+    }
+}
+
+- (void)updateAbsoluteScreenPosition {
+    if (self.window) {
+        CGPoint centerPoint = CGPointMake(self.bounds.size.width / 2, self.bounds.size.height / 2);
+        self.screenAbsolutePoint = [self convertPoint:centerPoint toView:nil];
+    }
+}
+@end
+
+@interface MustacheCoreWindow : UIWindow
+@property (nonatomic, strong) UIButton *floatingButton;
+@property (nonatomic, strong) UIView *menuView;
+@property (nonatomic, strong) NSMutableArray<MustacheTargetNode *> *targetsCollection;
+@property (nonatomic, assign) BOOL isMacroRunning;
+@property (nonatomic, assign) float clickInterval;
+@property (nonatomic, strong) dispatch_source_t highSpeedTimer;
+@end
+
+@implementation MustacheCoreWindow
+
+- (instancetype)init {
+    self = [super initWithFrame:[UIScreen mainScreen].bounds];
+    if (self) {
+        self.windowLevel = UIWindowLevelAlert - 1;
+        self.backgroundColor = [UIColor clearColor];
+
+        self.targetsCollection = [[NSMutableArray alloc] init];
+        self.clickInterval = 0.10;
+        self.isMacroRunning = NO;
+
+        [self createFloatingTrigger];
+        [self createMustacheMenu];
+    }
+    return self;
+}
+
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+    if ([self.floatingButton pointInside:[self.floatingButton convertPoint:point fromView:self] withEvent:event]) {
+        return YES;
+    }
+    if (!self.menuView.hidden && [self.menuView pointInside:[self.menuView convertPoint:point fromView:self] withEvent:event]) {
+        return YES;
+    }
+
+    for (MustacheTargetNode *node in self.targetsCollection) {
+        if ([node pointInside:[node convertPoint:point fromView:self] withEvent:event]) {
+            return YES;
         }
-        EOF
+    }
+    return NO;
+}
 
-        # 3. إنشاء ملف التجميع الـ Makefile
-        cat << 'EOF' > Makefile
-        TARGET := iphone:clang:latest:14.0
-        ARCHS := arm64 arm64e
+- (void)createFloatingTrigger {
+    self.floatingButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.floatingButton.frame = CGRectMake(40, 220, 75, 45);
+    self.floatingButton.backgroundColor = [UIColor blackColor];
+    [self.floatingButton setTitle:@"موستاش" forState:UIControlStateNormal];
+    [self.floatingButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.floatingButton.titleLabel.font = [UIFont boldSystemFontOfSize:13];
+    self.floatingButton.layer.cornerRadius = 12;
 
-        include $(THEOS)/makefiles/common.mk
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleButtonPan:)];
+    [self.floatingButton addGestureRecognizer:pan];
+    [self.floatingButton addTarget:self action:@selector(toggleMenuDisplay) forControlEvents:UIControlEventTouchUpInside];
 
-        TWEAK_NAME = MustacheSilentLudo
-        MustacheSilentLudo_FILES = main.mm
-        MustacheSilentLudo_CFLAGS = -fobjc-arc
-        MustacheSilentLudo_FRAMEWORKS = UIKit CoreGraphics
-        MustacheSilentLudo_PRIVATE_FRAMEWORKS = IOKit
+    [self addSubview:self.floatingButton];
+}
 
-        include $(THEOS_MAKE_PATH)/tweak.mk
-        EOF
+- (void)handleButtonPan:(UIPanGestureRecognizer *)sender {
+    CGPoint translation = [sender translationInView:self];
+    sender.view.center = CGPointMake(sender.view.center.x + translation.x, sender.view.center.y + translation.y);
+    [sender setTranslation:CGPointZero inView:self];
+}
 
-        # 4. كتابة ملف البرمجة الذكي الصامت (main.mm) المرتبط بأزرار الصوت
-        cat << 'EOF' > main.mm
-        #import <UIKit/UIKit.h>
-        #import <CoreGraphics/CoreGraphics.h>
-        #import <mach/mach_time.h>
+- (void)toggleMenuDisplay {
+    self.menuView.hidden = !self.menuView.hidden;
 
-        // استدعاء حاقن أحداث اللمس الفيزيائية للنظام لتخطي حماية لودو
-        extern "C" {
-            CFTypeRef IOHIDEventCreateDigitizerFingerEvent(CFAllocatorRef allocator, uint64_t timeStamp, uint32_t index, uint32_t identity, uint32_t eventMask, float x, float y, float z, float tipPressure, float twist, objc_bool isInRange, objc_bool isTouched, uint32_t options);
-            void IOHIDEventSystemClientQueueEvent(CFTypeRef client, CFTypeRef event);
-            CFTypeRef IOHIDEventSystemClientCreate(CFAllocatorRef allocator);
+    [UIView animateWithDuration:0.3 animations:^{
+        self.menuView.backgroundColor = self.menuView.hidden ? [[UIColor blackColor] colorWithAlphaComponent:0.96] : [[UIColor greenColor] colorWithAlphaComponent:0.96];
+    }];
+}
+
+- (void)createMustacheMenu {
+    self.menuView = [[UIView alloc] initWithFrame:CGRectMake(40, 275, 250, 270)];
+    self.menuView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.96];
+    self.menuView.layer.cornerRadius = 15;
+    self.menuView.hidden = YES;
+    [self addSubview:self.menuView];
+}
+
+- (void)startAutoTap {
+    if (self.highSpeedTimer) return;
+
+    self.highSpeedTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    dispatch_source_set_timer(self.highSpeedTimer, DISPATCH_TIME_NOW, self.clickInterval * NSEC_PER_SEC, 0.1 * NSEC_PER_SEC);
+    dispatch_source_set_event_handler(self.highSpeedTimer, ^{
+        for (MustacheTargetNode *node in self.targetsCollection) {
+            CFTypeRef event = IOHIDEventCreateDigitizerFingerEvent(
+                kCFAllocatorDefault, mach_absolute_time(), 0, 1, 2,
+                node.screenAbsolutePoint.x, node.screenAbsolutePoint.y, 0, 1.0, 0.0, true, true, 0
+            );
+            ISendHIDEvent(event);
+            CFRelease(event);
         }
+    });
+    dispatch_resume(self.highSpeedTimer);
+}
 
-        // إدارة معالج النقر صامتاً في الخلفية
-        @interface MustacheLudoEngine : NSObject
-        @property (nonatomic, assign) BOOL isClicking;
-        @property (nonatomic, assign) CFTypeRef hidClient;
-        @property (nonatomic, strong) dispatch_source_t ludoTimer;
-        + (instancetype)sharedEngine;
-        - (void)startClicking;
-        - (void)stopClicking;
-        @end
-
-        @implementation MustacheLudoEngine
-
-        + (instancetype)sharedEngine {
-            static MustacheLudoEngine *shared = nil;
-            static dispatch_once_t onceToken;
-            dispatch_once(&onceToken, ^{
-                shared = [[self alloc] init];
-            });
-            return shared;
-        }
-
-        - (instancetype)init {
-            self = [super init];
-            if (self) {
-                self.isClicking = NO;
-                self.hidClient = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
-            }
-            return self;
-        }
-
-        - (void)startClicking {
-            if (self.isClicking) return;
-            self.isClicking = YES;
-            
-            // تشغيل ميقاتي النقرات السريع على مسار خلفي منفصل تماماً لمنع أي فريز باللعبة
-            dispatch_queue_t ludoQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0);
-            self.ludoTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, ludoQueue);
-            
-            // سرعة النقر الافتراضية (0.05 ثانية - سريعة وخارقة لضرب النرد والقطع)
-            uint64_t interval = (uint64_t)(0.05 * NSEC_PER_SEC);
-            dispatch_source_set_timer(self.ludoTimer, dispatch_walltime(NULL, 0), interval, 0);
-            
-            dispatch_source_set_event_handler(self.ludoTimer, ^{
-                // إحداثيات افتراضية لمنتصف الشاشة وموقع النرد في لودو (يتم ضبطها حسب موديل الأيفون)
-                // الإحداثي الافتراضي لغالبية شاشات الأيفون هو تقريباً (X: 187, Y: 550) لمكان النرد
-                CGPoint nardPoint = CGPointMake(187.0, 550.0);
-                [self injectLudoHardwareTouchAt:nardPoint];
-            });
-            dispatch_resume(self.ludoTimer);
-        }
-
-        - (void)stopClicking {
-            if (!self.isClicking) return;
-            self.isClicking = NO;
-            if (self.ludoTimer) {
-                dispatch_source_cancel(self.ludoTimer);
-                self.ludoTimer = nil;
-            }
-        }
-
-        - (void)injectLudoHardwareTouchAt:(CGPoint)point {
-            if (!self.hidClient) return;
-            
-            uint64_t downTime = mach_absolute_time();
-            CFTypeRef touchDown = IOHIDEventCreateDigitizerFingerEvent(kCFAllocatorDefault, downTime, 1, 2, 3, point.x, point.y, 0, 1.0, 0, true, true, 0);
-            if (touchDown) {
-                IOHIDEventSystemClientQueueEvent(self.hidClient, touchDown);
-                CFRelease(touchDown);
-            }
-            
-            uint64_t upTime = mach_absolute_time();
-            CFTypeRef touchUp = IOHIDEventCreateDigitizerFingerEvent(kCFAllocatorDefault, upTime, 1, 2, 0, point.x, point.y, 0, 0.0, 0, true, false, 0);
-            if (touchUp) {
-                IOHIDEventSystemClientQueueEvent(self.hidClient, touchUp);
-                CFRelease(touchUp);
-            }
-        }
-        @end
-
-        // 🚀 خطف أزرار رفع وخفض الصوت من النظام للتحكم بالماكرو صامتاً 🚀
-        %hook VolumeControl
-        - (void)increaseVolume {
-            // عند ضغط زر رفع الصوت (+)، يتم تفعيل الكليكر فوراً
-            [[MustacheLudoEngine sharedEngine] startClicking];
-        }
-
-        - (void)decreaseVolume {
-            // عند ضغط زر خفض الصوت (-)، يتم إيقاف الكليكر فوراً
-            [[MustacheLudoEngine sharedEngine] stopClicking];
-        }
-        %end
-
-        static void __attribute__((constructor)) initMustacheSilentCore() {
-            // تهيئة معالج لودو الصامت عند تشغيل اللعبة
-            [MustacheLudoEngine sharedEngine];
-        }
-        EOF
-
-    - name: Download Theos Toolchain
-      run: |
-        bash -c "$(curl -fsSL https://githubusercontent.com)"
-        echo "THEOS=~/theos" >> $GITHUB_ENV
-
-    - name: Compile Package
-      run: |
-        make package FINALPACKAGE=1
+- (void)stopAutoTap {
+    if (self.highSpeedTimer) {
+        dispatch_source_cancel(self.highSpeedTimer);
+        self.highSpeedTimer = nil;
+    }
+}
+@end
