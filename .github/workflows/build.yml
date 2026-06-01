@@ -1,172 +1,190 @@
-#import <UIKit/UIKit.h>
-#import <CoreGraphics/CoreGraphics.h>
-#import <QuartzCore/QuartzCore.h>
-#import <mach/mach_time.h>
+name: Mustache Pro Mod Menu Builder
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
-extern "C" {
-    CFTypeRef IOHIDEventCreateDigitizerFingerEvent(CFAllocatorRef allocator, uint64_t timeStamp, uint32_t index, uint32_t identity, uint32_t eventMask, float x, float y, float z, float tipPressure, float twist, objc_bool isInRange, objc_bool isTouched, uint32_t options);
-    void ISendHIDEvent(CFTypeRef event);
-}
+jobs:
+  build_job:
+    runs-on: macos-14
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-@interface MustacheTargetNode : UIView
-@property (nonatomic, assign) CGPoint screenAbsolutePoint;
-@property (nonatomic, strong) UILabel *numberLabel;
-@end
+    - name: Write Integrated Source Code
+      run: |
+        cat << 'EOF' > MustacheMenu.mm
+        #import <UIKit/UIKit.h>
+        #import <CoreGraphics/CoreGraphics.h>
+        #import <QuartzCore/QuartzCore.h>
+        #import <mach/mach_time.h>
 
-@implementation MustacheTargetNode
-- (instancetype)initWithFrame:(CGRect)frame index:(NSInteger)index {
-    self = [super initWithFrame:frame];
-    if (self) {
-        self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
-        self.layer.cornerRadius = frame.size.width / 2;
-        self.layer.borderColor = [UIColor whiteColor].CGColor;
-        self.layer.borderWidth = 2.5;
+        // ==========================================================
+        // 1. تصميم الأهداف المتعددة المرقمة الفخمة باللون الذهبي والأسود
+        // ==========================================================
+        @interface MustacheTargetNode : UIView
+        @property (nonatomic, assign) CGPoint screenAbsolutePoint; 
+        @property (nonatomic, strong) UILabel *numberLabel;
+        @end
 
-        self.numberLabel = [[UILabel alloc] initWithFrame:self.bounds];
-        self.numberLabel.text = [NSString stringWithFormat:@"%ld", (long)index];
-        self.numberLabel.textColor = [UIColor whiteColor];
-        self.numberLabel.textAlignment = NSTextAlignmentCenter;
-        self.numberLabel.font = [UIFont boldSystemFontOfSize:14];
-        [self addSubview:self.numberLabel];
-
-        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleNodePan:)];
-        [self addGestureRecognizer:pan];
-
-        [self updateAbsoluteScreenPosition];
-    }
-    return self;
-}
-
-- (void)handleNodePan:(UIPanGestureRecognizer *)sender {
-    CGPoint translation = [sender translationInView:self.superview];
-    CGPoint newCenter = CGPointMake(self.center.x + translation.x, self.center.y + translation.y);
-
-    CGFloat halfWidth = self.bounds.size.width / 2.0;
-    CGFloat halfHeight = self.bounds.size.height / 2.0;
-    CGSize screenSize = [UIScreen mainScreen].bounds.size;
-
-    newCenter.x = MAX(halfWidth, MIN(newCenter.x, screenSize.width - halfWidth));
-    newCenter.y = MAX(halfHeight, MIN(newCenter.y, screenSize.height - halfHeight));
-
-    self.center = newCenter;
-    [sender setTranslation:CGPointZero inView:self.superview];
-
-    if (sender.state == UIGestureRecognizerStateEnded || sender.state == UIGestureRecognizerStateChanged) {
-        [self updateAbsoluteScreenPosition];
-    }
-}
-
-- (void)updateAbsoluteScreenPosition {
-    if (self.window) {
-        CGPoint centerPoint = CGPointMake(self.bounds.size.width / 2, self.bounds.size.height / 2);
-        self.screenAbsolutePoint = [self convertPoint:centerPoint toView:nil];
-    }
-}
-@end
-
-@interface MustacheCoreWindow : UIWindow
-@property (nonatomic, strong) UIButton *floatingButton;
-@property (nonatomic, strong) UIView *menuView;
-@property (nonatomic, strong) NSMutableArray<MustacheTargetNode *> *targetsCollection;
-@property (nonatomic, assign) BOOL isMacroRunning;
-@property (nonatomic, assign) float clickInterval;
-@property (nonatomic, strong) dispatch_source_t highSpeedTimer;
-@end
-
-@implementation MustacheCoreWindow
-
-- (instancetype)init {
-    self = [super initWithFrame:[UIScreen mainScreen].bounds];
-    if (self) {
-        self.windowLevel = UIWindowLevelAlert - 1;
-        self.backgroundColor = [UIColor clearColor];
-
-        self.targetsCollection = [[NSMutableArray alloc] init];
-        self.clickInterval = 0.10;
-        self.isMacroRunning = NO;
-
-        [self createFloatingTrigger];
-        [self createMustacheMenu];
-    }
-    return self;
-}
-
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    if ([self.floatingButton pointInside:[self.floatingButton convertPoint:point fromView:self] withEvent:event]) {
-        return YES;
-    }
-    if (!self.menuView.hidden && [self.menuView pointInside:[self.menuView convertPoint:point fromView:self] withEvent:event]) {
-        return YES;
-    }
-
-    for (MustacheTargetNode *node in self.targetsCollection) {
-        if ([node pointInside:[node convertPoint:point fromView:self] withEvent:event]) {
-            return YES;
+        @implementation MustacheTargetNode
+        - (instancetype)initWithFrame:(CGRect)frame index:(NSInteger)index {
+            self = [super initWithFrame:frame];
+            if (self) {
+                // تصميم VIP: خلفية ذهبية شفافة مع إطار أسود عريض وواضح
+                self.backgroundColor = [[UIColor colorWithRed:0.85 green:0.65 blue:0.13 alpha:1.0] colorWithAlphaComponent:0.75];
+                self.layer.cornerRadius = frame.size.width / 2;
+                self.layer.borderColor = [UIColor blackColor].CGColor;
+                self.layer.borderWidth = 2.5;
+                self.userInteractionEnabled = YES;
+                
+                // الرقم في المنتصف باللون الأسود العريض
+                self.numberLabel = [[UILabel alloc] initWithFrame:self.bounds];
+                self.numberLabel.text = [NSString stringWithFormat:@"%ld", (long)index];
+                self.numberLabel.textColor = [UIColor blackColor];
+                self.numberLabel.textAlignment = NSTextAlignmentCenter;
+                self.numberLabel.font = [UIFont boldSystemFontOfSize:15];
+                [self addSubview:self.numberLabel];
+                
+                UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleNodePan:)];
+                [self addGestureRecognizer:pan];
+                
+                [self updateAbsolutePosition];
+            }
+            return self;
         }
-    }
-    return NO;
-}
 
-- (void)createFloatingTrigger {
-    self.floatingButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.floatingButton.frame = CGRectMake(40, 220, 75, 45);
-    self.floatingButton.backgroundColor = [UIColor blackColor];
-    [self.floatingButton setTitle:@"موستاش" forState:UIControlStateNormal];
-    [self.floatingButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.floatingButton.titleLabel.font = [UIFont boldSystemFontOfSize:13];
-    self.floatingButton.layer.cornerRadius = 12;
-
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleButtonPan:)];
-    [self.floatingButton addGestureRecognizer:pan];
-    [self.floatingButton addTarget:self action:@selector(toggleMenuDisplay) forControlEvents:UIControlEventTouchUpInside];
-
-    [self addSubview:self.floatingButton];
-}
-
-- (void)handleButtonPan:(UIPanGestureRecognizer *)sender {
-    CGPoint translation = [sender translationInView:self];
-    sender.view.center = CGPointMake(sender.view.center.x + translation.x, sender.view.center.y + translation.y);
-    [sender setTranslation:CGPointZero inView:self];
-}
-
-- (void)toggleMenuDisplay {
-    self.menuView.hidden = !self.menuView.hidden;
-
-    [UIView animateWithDuration:0.3 animations:^{
-        self.menuView.backgroundColor = self.menuView.hidden ? [[UIColor blackColor] colorWithAlphaComponent:0.96] : [[UIColor greenColor] colorWithAlphaComponent:0.96];
-    }];
-}
-
-- (void)createMustacheMenu {
-    self.menuView = [[UIView alloc] initWithFrame:CGRectMake(40, 275, 250, 270)];
-    self.menuView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.96];
-    self.menuView.layer.cornerRadius = 15;
-    self.menuView.hidden = YES;
-    [self addSubview:self.menuView];
-}
-
-- (void)startAutoTap {
-    if (self.highSpeedTimer) return;
-
-    self.highSpeedTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-    dispatch_source_set_timer(self.highSpeedTimer, DISPATCH_TIME_NOW, self.clickInterval * NSEC_PER_SEC, 0.1 * NSEC_PER_SEC);
-    dispatch_source_set_event_handler(self.highSpeedTimer, ^{
-        for (MustacheTargetNode *node in self.targetsCollection) {
-            CFTypeRef event = IOHIDEventCreateDigitizerFingerEvent(
-                kCFAllocatorDefault, mach_absolute_time(), 0, 1, 2,
-                node.screenAbsolutePoint.x, node.screenAbsolutePoint.y, 0, 1.0, 0.0, true, true, 0
-            );
-            ISendHIDEvent(event);
-            CFRelease(event);
+        - (void)handleNodePan:(UIPanGestureRecognizer *)sender {
+            CGPoint translation = [sender translationInView:self.superview];
+            self.center = CGPointMake(self.center.x + translation.x, self.center.y + translation.y);
+            [sender setTranslation:CGPointMake(0, 0) inView:self.superview];
+            
+            if (sender.state == UIGestureRecognizerStateEnded || sender.state == UIGestureRecognizerStateChanged) {
+                [self updateAbsolutePosition];
+            }
         }
-    });
-    dispatch_resume(self.highSpeedTimer);
-}
 
-- (void)stopAutoTap {
-    if (self.highSpeedTimer) {
-        dispatch_source_cancel(self.highSpeedTimer);
-        self.highSpeedTimer = nil;
-    }
-}
-@end
+        - (void)updateAbsolutePosition {
+            self.screenAbsolutePoint = self.center;
+        }
+        @end
+
+        // ==========================================================
+        // 2. إدارة لوحة التحكم وحقنها في نافذة اللعبة (تصميم ذهبي ملكي)
+        // ==========================================================
+        @interface MustacheLudoController : NSObject
+        @property (nonatomic, strong) UIButton *floatingButton;
+        @property (nonatomic, strong) UIView *menuContainer;
+        @property (nonatomic, strong) UISlider *speedSlider;
+        @property (nonatomic, strong) UILabel *speedLabel;
+        @property (nonatomic, strong) UIButton *toggleButton;
+        @property (nonatomic, strong) NSMutableArray<MustacheTargetNode *> *targetsArray;
+        @property (nonatomic, assign) BOOL isRunning;
+        @property (nonatomic, assign) float interval;
+        @property (nonatomic, strong) dispatch_source_t clickTimer;
+        + (instancetype)sharedInstance;
+        - (void)initMenuInsideGame;
+        @end
+
+        @implementation MustacheLudoController
+
+        + (instancetype)sharedInstance {
+            static MustacheLudoController *instance = nil;
+            static dispatch_once_t onceToken;
+            dispatch_once(&onceToken, ^{
+                instance = [[self alloc] init];
+            });
+            return instance;
+        }
+
+        - (instancetype)init {
+            self = [super init];
+            if (self) {
+                self.targetsArray = [[NSMutableArray alloc] init];
+                self.interval = 0.10;
+                self.isRunning = NO;
+            }
+            return self;
+        }
+
+        - (void)initMenuInsideGame {
+            UIWindow *gameWindow = [UIApplication sharedApplication].keyWindow;
+            if (!gameWindow && @available(iOS 13.0, *)) {
+                for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+                    if (scene.activationState == UISceneActivationStateForegroundActive) {
+                        gameWindow = scene.windows.firstObject;
+                        break;
+                    }
+                }
+            }
+            if (!gameWindow) return;
+
+            // 🌟 تصميم الزر العائم: دائري أسود ملكي فخم يحيطه إطار ذهبي مشع
+            self.floatingButton = [UIButton buttonWithType:UIButtonTypeCustom];
+            self.floatingButton.frame = CGRectMake(50, 180, 60, 60);
+            self.floatingButton.backgroundColor = [UIColor blackColor];
+            [self.floatingButton setTitle:@"M" forState:UIControlStateNormal];
+            [self.floatingButton setTitleColor:[UIColor colorWithRed:0.93 green:0.75 blue:0.25 alpha:1.0] forState:UIControlStateNormal];
+            self.floatingButton.titleLabel.font = [UIFont boldSystemFontOfSize:22];
+            self.floatingButton.layer.cornerRadius = 30; // جعل الزر دائري بالكامل
+            self.floatingButton.layer.borderWidth = 2.5;
+            self.floatingButton.layer.borderColor = [UIColor colorWithRed:0.93 green:0.75 blue:0.25 alpha:1.0].CGColor; // إطار ذهبي
+            
+            // إضافة ظلال ذهبية متوهجة حول الزر العائم
+            self.floatingButton.layer.shadowColor = [UIColor colorWithRed:0.93 green:0.75 blue:0.25 alpha:1.0].CGColor;
+            self.floatingButton.layer.shadowOpacity = 0.8;
+            self.floatingButton.layer.shadowRadius = 8;
+            self.floatingButton.layer.shadowOffset = CGSizeZero;
+
+            UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleButtonPan:)];
+            [self.floatingButton addGestureRecognizer:pan];
+            [self.floatingButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
+            [gameWindow addSubview:self.floatingButton];
+            
+            // 🌟 تصميم القائمة: أسود داكن VIP شفاف بنسبة بسيطة مع حواف ذهبية فخمة
+            self.menuContainer = [[UIView alloc] initWithFrame:CGRectMake(50, 250, 260, 280)];
+            self.menuContainer.backgroundColor = [[UIColor colorWithRed:0.07 green:0.07 blue:0.07 alpha:1.0] colorWithAlphaComponent:0.98];
+            self.menuContainer.layer.cornerRadius = 18;
+            self.menuContainer.layer.borderColor = [UIColor colorWithRed:0.93 green:0.75 blue:0.25 alpha:1.0].CGColor; // إطار ذهبي للقائمة
+            self.menuContainer.layer.borderWidth = 2.5;
+            self.menuContainer.hidden = YES;
+            
+            // عنوان القائمة باللون الذهبي
+            UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10, 15, 240, 25)];
+            title.text = @"👑 MUSTACHE AUTO MENU 👑";
+            title.textColor = [UIColor colorWithRed:0.93 green:0.75 blue:0.25 alpha:1.0];
+            title.textAlignment = NSTextAlignmentCenter;
+            title.font = [UIFont boldSystemFontOfSize:14];
+            [self.menuContainer addSubview:title];
+            
+            // زر "➕ اضافه هدف" بلون أسود وإطار ذهبي ونص ذهبي
+            UIButton *addBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+            addBtn.frame = CGRectMake(25, 55, 200, 36);
+            addBtn.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.12 alpha:1.0];
+            [addBtn setTitle:@"➕ اضافه هدف جديد" forState:UIControlStateNormal];
+            [addBtn setTitleColor:[UIColor colorWithRed:0.93 green:0.75 blue:0.25 alpha:1.0] forState:UIControlStateNormal];
+            addBtn.titleLabel.font = [UIFont boldSystemFontOfSize:12];
+            addBtn.layer.cornerRadius = 10;
+            addBtn.layer.borderWidth = 1.0;
+            addBtn.layer.borderColor = [UIColor colorWithRed:0.93 green:0.75 blue:0.25 alpha:1.0].CGColor;
+            [addBtn addTarget:self action:@selector(addTargetNode) forControlEvents:UIControlEventTouchUpInside];
+            [self.menuContainer addSubview:addBtn];
+            
+            // زر "❌ حذف آخر هدف" باللون الأحمر VIP الشيك
+            UIButton *removeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+            removeBtn.frame = CGRectMake(25, 100, 200, 36);
+            removeBtn.backgroundColor = [UIColor colorWithRed:0.65 green:0.10 blue:0.15 alpha:1.0];
+            [removeBtn setTitle:@"❌ حذف آخر هدف" forState:UIControlStateNormal];
+            [removeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            removeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:12];
+            removeBtn.layer.cornerRadius = 10;
+            [removeBtn addTarget:self action:@selector(removeLastNode) forControlEvents:UIControlEventTouchUpInside];
+            [self.menuContainer addSubview:removeBtn];
+            
+            // شريط السرعة (Slider) بلون ذهبي
+            self.speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(25, 150, 200, 30)];
+            self.speedSlider.minimumValue = 0.02;
+            self.speedSlider.maximumValue = 1.5;
+            self.speedSlider.value = 0.10;
+            self.speedSlider.minimumTrackTintColor = [UIColor colorWithRed:0.93 green:0.75 blue:0.25 alpha:1.0]; // ذهبي
+            self.speedSlider.maximumTrackTintColor = [UIColor darkGrayColor];
