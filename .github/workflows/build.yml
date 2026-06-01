@@ -1,27 +1,32 @@
-name: Mustache Pro Mod Menu Builder
+name: Build iOS Dylib
+
 on:
   push:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # يتيح لك تشغيل البناء يدوياً أيضاً
 
 jobs:
-  build_job:
-    runs-on: macos-14
+  build:
+    runs-on: macos-latest
+
     steps:
-    - name: Checkout Code
+    - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Compile and Zip Output
-      run: |
-        # تجميع ملف main.mm المحفوظ في مستودعك إلى dylib
-        xcrun -sdk iphoneos clang++ -dynamiclib -arch arm64 -arch arm64e -miphoneos-version-min=14.0 -fobjc-arc main.mm -o MustacheMenu.dylib -framework UIKit -framework CoreGraphics -framework QuartzCore
-        
-        # ضغط الملف بصيغة zip ليتعرف عليه الجوال فوراً للتحميل
-        zip MustacheMenu.zip MustacheMenu.dylib
-        echo "تم تجميع وضغط الملف بنجاح!"
+    - name: Set up Xcode
+      run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-    - name: Upload Zip Artifact
+    - name: Compile Dylib
+      run: |
+        clang++ -dynamiclib -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+        -arch arm64 -miphoneos-version-min=14.0 \
+        -framework UIKit -framework Foundation -framework CoreGraphics \
+        main.mm -o AutoTouchMenu.dylib
+
+    - name: Upload Dylib Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Download-AutoTouch-Zip
-        path: MustacheMenu.zip
+        name: AutoTouch-Compiled-Dylib
+        path: AutoTouchMenu.dylib
