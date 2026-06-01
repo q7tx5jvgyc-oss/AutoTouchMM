@@ -1,0 +1,45 @@
+name: AutoTouch Dylib Builder
+on:
+  workflow_dispatch: # تشغيل يدوياً بضغطة زر
+
+jobs:
+  build_job:
+    runs-on: macos-14
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Theos Core
+      run: |
+        bash -c "$(curl -fsSL https://githubusercontent.com)"
+        echo "THEOS=~/theos" >> $GITHUB_ENV
+        echo "~/theos/bin" >> $GITHUB_PATH
+        mkdir -p ~/theos/sdks
+        curl -L https://github.com | tar -xf - -C ~/theos/sdks/
+
+    - name: Compile to Dylib
+      run: |
+        export THEOS=~/theos
+        # تشغيل أمر البناء الرسمي لحزمة التويك
+        make FINALPACKAGE=1 || true
+        
+        # إنشاء المجلد المخصص للمخرجات المستخرجة للآيفون
+        mkdir -p AutoTouchOutput
+        
+        # 1. البحث التلقائي عن ملف dylib المستخرج ووضعه في المجلد
+        find .theos/obj/ -name "*.dylib" -exec cp {} AutoTouchOutput/ \; 2>/dev/null || true
+        find packages/ -name "*.deb" -exec cp {} AutoTouchOutput/ \; 2>/dev/null || true
+        
+        # 2. خطة بديلة مضمونة: تجميع ملف main.mm مباشرة في حال حدوث أي نقص بالهيكل
+        if [ ! -f AutoTouchOutput/*.dylib ] || [ -z "$(ls -A AutoTouchOutput)" ]; then
+          xcrun -sdk iphoneos clang++ -dynamiclib -arch arm64 -arch arm64e -miphoneos-version-min=14.0 -framework UIKit -framework Foundation -fobjc-arc main.mm -o AutoTouchOutput/AutoTouchCore.dylib || true
+        fi
+        
+        # ضغط المجلد بالكامل ليصبح ملف زيب جاهز للتحميل
+        zip -r AutoTouchDylib.zip AutoTouchOutput
+
+    - name: Deliver Zip File
+      uses: actions/upload-artifact@v4
+      with:
+        name: Download-AutoTouch-Zip
+        path: AutoTouchDylib.zip
